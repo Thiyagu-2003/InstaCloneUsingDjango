@@ -107,7 +107,7 @@
         <div id="chat-messages" class="flex-grow-1 overflow-hidden">
           <div class="messages-container h-100 overflow-auto p-3" id="messages-scroll">
             {% for message in chat_messages %}
-              <div class="message-wrapper mb-3" data-message-id="{{ message.id }}">
+              <div class="message-wrapper mb-3" data-message-id="{{ message.id }}" data-timestamp="{{ message.created_at|date:'c' }}">
                 {% if message.sender == request.user %}
                   <!-- Sent message (right aligned) -->
                   <div class="d-flex justify-content-end">
@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', function() {
     messageWrapper.className = 'message-wrapper mb-3';
     messageWrapper.dataset.messageId = messageId;
     messageWrapper.dataset.sender = sender;
-    messageWrapper.dataset.timestamp = currentTime.toString();
+    messageWrapper.dataset.timestamp = timestamp ? new Date(timestamp).getTime() : currentTime;
 
     const formattedTime = timestamp ? formatTimestamp(timestamp) : formatTimestamp(new Date());
 
@@ -614,6 +614,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log(`Message appended: ${sender} - ${message} - ${formattedTime}`);
   }
+
+  // Initialize existing messages with their timestamps
+  function initializeExistingMessages() {
+    const messageWrappers = document.querySelectorAll('.message-wrapper');
+    messageWrappers.forEach(wrapper => {
+      const timestamp = wrapper.dataset.timestamp;
+      if (timestamp) {
+        const timeElement = wrapper.querySelector('.message-time small');
+        if (timeElement) {
+          timeElement.textContent = formatTimestamp(timestamp);
+        }
+      }
+    });
+  }
+
+  // Call this function on page load
+  initializeExistingMessages();
 
   function updateThreadIndicator(senderId) {
     const threadLink = document.querySelector(`.user-item[data-user-id="${senderId}"]`);
