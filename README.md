@@ -341,4 +341,4 @@ Got questions or want to collaborate? Feel free to reach out!
 
 ⭐ **If you found this project helpful, please give it a star!** ⭐
 
-Made with ❤️ by [Thiyagu](https://github.com/Thiyagu-2003)
+Made with ❤️ by [Thiyagu S](https://github.com/Thiyagu-2003)
