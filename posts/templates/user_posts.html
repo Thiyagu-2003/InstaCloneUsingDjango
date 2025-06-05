@@ -1,0 +1,38 @@
+{% extends "posts/base.html" %}
+{% block content %}
+<h1 class="mb-3">Posts by {{ user.username }} ({{ posts.count }})</h1>
+
+{% for post in posts %}
+    <article class="media content-section">
+        <img class="rounded-circle article-img" src="{{ post.author.profile_pic.url }}">
+        <div class="media-body">
+            <div class="article-metadata">
+                <a class="mr-2" href="{% url 'user-posts' post.author.username %}">{{ post.author.username }}</a>
+                <small class="text-muted">{{ post.date_posted|date:"F d, Y" }}</small>
+            </div>
+            <img class="post-img" src="{{ post.image.url }}">
+            <p class="article-content">{{ post.caption }}</p>
+            <div>
+                <a href="{% url 'post-detail' post.id %}">Comments: {{ post.comments.count }}</a>
+
+                <!-- ✅ Like Button POST Form -->
+                <form method="POST" action="{% url 'like-post' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="post_id" value="{{ post.id }}">
+                    <input type="hidden" name="next" value="user-posts">
+                    <button type="submit" class="btn btn-link p-0" style="border: none; background: none;">
+                        {% if user in post.likes.all %}
+                            <i class="fas fa-heart" style="color: red;"></i>
+                        {% else %}
+                            <i class="far fa-heart"></i>
+                        {% endif %}
+                        <span id="like-count">{{ post.likes.count }}</span>
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </article>
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,304 @@
+{% extends "posts/base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+<style>
+  /* Container styling for the main post */
+  article.media.content-section {
+    display: flex;
+    align-items: flex-start;
+    background: #fff;
+    border-radius: 1rem;
+    padding: 2.5rem 3rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    transition: box-shadow 0.3s ease;
+  }
+  article.media.content-section:hover {
+    box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+  }
+
+  /* Author profile image */
+  .article-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 2rem;
+    border: 3px solid #2980b9;
+    box-shadow: 0 0 15px rgba(41, 128, 185, 0.25);
+  }
+
+  /* Metadata (author and date) */
+  .article-metadata {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+  .article-metadata a {
+    font-weight: 700;
+    color: #2471a3;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+  .article-metadata a:hover {
+    color: #1a4970;
+    text-decoration: underline;
+  }
+  .article-metadata small {
+    color: #7f8c8d;
+  }
+
+  /* Post image */
+  .post-img {
+    max-width: 100%;
+    border-radius: 0.8rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 8px 22px rgba(41, 128, 185, 0.18);
+  }
+
+  /* Post caption */
+  .article-content {
+    font-size: 1.2rem;
+    line-height: 1.75;
+    color: #34495e;
+    margin-bottom: 1.8rem;
+    white-space: pre-line;
+  }
+
+  /* Like button styling */
+  #like-button {
+    display: inline-flex;
+    align-items: center;
+    background-color: #2980b9;
+    color: #fff;
+    border: none;
+    padding: 0.55rem 1.4rem;
+    font-weight: 700;
+    border-radius: 0.5rem;
+    box-shadow: 0 6px 18px rgba(41, 128, 185, 0.4);
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    user-select: none;
+    font-size: 1rem;
+  }
+  #like-button:hover {
+    background-color: #1c5988;
+    box-shadow: 0 8px 25px rgba(28, 89, 136, 0.6);
+  }
+  #like-button i {
+    margin-right: 0.6rem;
+    font-size: 1.4rem;
+    color: #fff;
+  }
+  #like-button i.fas {
+    color: #e74c3c;
+  }
+
+  /* Comments container */
+  .content-section {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    background: #fff;
+    border-radius: 1rem;
+    padding: 2.5rem 3rem;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+  }
+
+  /* Comments header */
+  .content-section h4 {
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+  }
+
+  /* Individual comment */
+  .media.mb-4 {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+  }
+  .comment-img {
+    width: 45px !important;
+    height: 45px !important;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 0 8px rgba(41, 128, 185, 0.2);
+    flex-shrink: 0;
+  }
+  .media-body.ml-3 {
+    margin-left: 1.25rem;
+    background: #f4f8fc;
+    padding: 0.85rem 1rem;
+    border-radius: 0.7rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .media-body h6 {
+    margin-top: 0;
+    font-weight: 700;
+    color: #2980b9;
+    margin-bottom: 0.3rem;
+  }
+  .media-body small {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    margin-top: 0.35rem;
+    display: block;
+  }
+
+  /* Comment form styling */
+  form fieldset {
+    border: none;
+    padding: 0;
+  }
+  .form-group {
+    margin-top: 1.2rem;
+  }
+  .btn-outline-info {
+    background-color: #2980b9;
+    color: #fff;
+    border: none;
+    padding: 0.55rem 1.5rem;
+    font-weight: 700;
+    border-radius: 0.5rem;
+    box-shadow: 0 6px 18px rgba(41, 128, 185, 0.4);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .btn-outline-info:hover {
+    background-color: #1c5988;
+    box-shadow: 0 8px 25px rgba(28, 89, 136, 0.6);
+    color: #ecf0f1;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width: 576px) {
+    article.media.content-section {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .article-img {
+      margin-bottom: 1rem;
+    }
+    .article-metadata {
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .content-section {
+      padding: 2rem 1.5rem;
+    }
+    .media.mb-4 {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .media-body.ml-3 {
+      margin-left: 0;
+      margin-top: 0.7rem;
+    }
+  }
+</style>
+
+
+<article class="media content-section">
+    <img class="rounded-circle article-img" src="{{ post.author.profile_pic.url }}" alt="{{ post.author.username }}'s profile picture">
+    <div class="media-body">
+        <div class="article-metadata">
+            <a class="mr-2" href="{% url 'user-posts' post.author.username %}">{{ post.author.username }}</a>
+            <small class="text-muted">{{ post.date_posted|date:"F d, Y" }}</small>
+        </div>
+
+        <img class="post-img" src="{{ post.image.url }}" alt="Image posted by {{ post.author.username }}">
+        <p class="article-content">{{ post.caption }}</p>
+
+        <!-- ✅ AJAX Like Button -->
+        <button id="like-button"
+                type="button"
+                data-post-id="{{ post.id }}"
+                class="btn btn-link p-0"
+                style="border: none; background: none;">
+            {% if is_liked %}
+                <i class="fas fa-heart text-danger"></i>
+            {% else %}
+                <i class="far fa-heart"></i>
+            {% endif %}
+            <span id="like-count">{{ total_likes }}</span>
+        </button>
+    </div>
+</article>
+
+<!-- ✅ Comments Section -->
+<div class="content-section">
+    <h4>Comments</h4>
+    {% for comment in comments %}
+        <div class="media mb-4">
+            <img class="rounded-circle comment-img" src="{{ comment.author.profile_pic.url }}" alt="{{ comment.author.username }}'s profile picture">
+            <div class="media-body ml-3">
+                <h6 class="mt-0">{{ comment.author.username }}</h6>
+                {{ comment.text }}
+                <small class="text-muted d-block">{{ comment.created_date|timesince }} ago</small>
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-muted">No comments yet. Be the first to comment!</p>
+    {% endfor %}
+
+    <!-- Comment Form -->
+    <form method="POST">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            {{ comment_form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Add Comment</button>
+        </div>
+    </form>
+</div>
+
+<!-- ✅ JavaScript for AJAX Like Toggle -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const likeBtn = document.getElementById('like-button');
+    const csrftoken = '{{ csrf_token }}';
+    const postId = likeBtn.dataset.postId;
+
+    likeBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        fetch("{% url 'like-post' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: new URLSearchParams({
+                post_id: postId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const icon = likeBtn.querySelector('i');
+            const count = likeBtn.querySelector('#like-count');
+            count.textContent = data.like_count;
+
+            if (data.liked) {
+                icon.className = 'fas fa-heart text-danger';
+            } else {
+                icon.className = 'far fa-heart';
+            }
+        })
+        .catch(err => {
+            console.error("Error liking post:", err);
+        });
+    });
+});
+</script>
+{% endblock %}
+
+

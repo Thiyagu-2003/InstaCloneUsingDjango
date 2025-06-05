@@ -1,0 +1,577 @@
+{% extends "posts/base.html" %}
+
+{% block content %}
+<style>
+  /* Custom styles for chat */
+  .message-bubble {
+    max-width: 70%;
+    word-wrap: break-word;
+  }
+  #chat-messages {
+    height: 400px;
+    overflow-y: auto;
+  }
+  .list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+  }
+  .online-status span {
+    font-size: 0.9rem;
+  }
+  /* Hide any Django messages on chat page */
+  .alert {
+    display: none !important;
+  }
+</style>
+
+<!-- Override the base.html structure for full-width chat -->
+</div></div></main>
+
+<main role="main" class="container-fluid" style="margin-top: 80px;">
+<div class="container">
+  <div class="row">
+    <!-- Left sidebar: All users and your chat threads -->
+    <div class="col-md-4">
+      <h4>All Users</h4>
+      <div class="list-group mb-4">
+        {% for user in all_users %}
+          <a href="{% url 'chat' user.username %}" 
+             class="list-group-item list-group-item-action {% if user == receiver %}active{% endif %}" 
+             data-user-id="{{ user.id }}">
+            <img src="{{ user.profile_pic.url|default:'/static/default_profile.jpg' }}" 
+                 class="rounded-circle me-2" width="36" height="36" 
+                 onerror="this.src='/static/default_profile.jpg'">
+            {{ user.username }}
+          </a>
+        {% empty %}
+          <div class="list-group-item text-muted">No other users found.</div>
+        {% endfor %}
+      </div>
+
+      <h4>Your Chats</h4>
+      <div class="list-group">
+        {% for thread in threads %}
+          {% for participant in thread.users.all %}
+            {% if participant != request.user %}
+              <a href="{% url 'chat' participant.username %}" 
+                 class="list-group-item list-group-item-action {% if participant == receiver %}active{% endif %}" 
+                 data-user-id="{{ participant.id }}">
+                <img src="{{ participant.profile_pic.url|default:'/static/default_profile.jpg' }}" 
+                     class="rounded-circle me-2" width="36" height="36" 
+                     onerror="this.src='/static/default_profile.jpg'">
+                {{ participant.username }}
+                {% with last_message=thread.messages.last %}
+                  {% if last_message and last_message.sender != request.user and not last_message.read %}
+                    <span class="badge bg-primary float-end">New</span>
+                  {% endif %}
+                {% endwith %}
+              </a>
+            {% endif %}
+          {% endfor %}
+        {% empty %}
+          <div class="list-group-item text-muted">No conversations yet</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Main chat area -->
+    <div class="col-md-8">
+      {% if receiver %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3>Chat with {{ receiver.username }}</h3>
+          <div class="online-status">
+            <span class="badge bg-success">Online</span>
+          </div>
+        </div>
+
+        <div id="chat-messages" class="card mb-3">
+          <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+            {% for message in chat_messages %}
+              <div class="mb-3 message-item">
+                <div class="d-flex align-items-start {% if message.sender != request.user %}justify-content-start{% else %}justify-content-end{% endif %} mb-1">
+                  {% if message.sender != request.user %}
+                    <img src="{{ message.sender.profile_pic.url|default:'/static/default_profile.jpg' }}" 
+                         class="rounded-circle me-2" width="36" height="36"
+                         onerror="this.src='/static/default_profile.jpg'">
+                  {% endif %}
+                  <div class="message-content {% if message.sender != request.user %}text-start{% else %}text-end{% endif %}">
+                    <div class="message-bubble {% if message.sender == request.user %}bg-primary text-white{% else %}bg-light{% endif %} p-2 rounded">
+                      <p class="mb-0">{{ message.text }}</p>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                      {{ message.created_at|date:"H:i, M d" }}
+                    </small>
+                  </div>
+                  {% if message.sender == request.user %}
+                    <img src="{{ message.sender.profile_pic.url|default:'/static/default_profile.jpg' }}" 
+                         class="rounded-circle ms-2" width="36" height="36"
+                         onerror="this.src='/static/default_profile.jpg'">
+                  {% endif %}
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-center text-muted py-4">
+                <p>No messages yet. Start the conversation!</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Message form -->
+        <div class="message-form">
+          <form id="message-form" method="post" action="{% url 'send_message' %}">
+            {% csrf_token %}
+            <input type="hidden" name="receiver" id="receiver-input" value="{{ receiver.username }}">
+            <div class="input-group">
+              <input type="text" id="chat-message-input" name="message" class="form-control" placeholder="Type your message..." required autocomplete="off">
+              <button type="submit" id="chat-message-submit" class="btn btn-primary">Send</button>
+            </div>
+          </form>
+        </div>
+      {% else %}
+        <div class="alert alert-info" style="display: block !important;">Select a user from the left sidebar to start chatting.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Chat page loaded');
+  
+  const messageForm = document.getElementById('message-form');
+  const messageInput = document.getElementById('chat-message-input');
+  const chatMessages = document.getElementById('chat-messages');
+  const receiverInput = document.getElementById('receiver-input');
+
+  // Scroll chat to bottom on load
+  if (chatMessages) {
+    const cardBody = chatMessages.querySelector('.card-body');
+    if (cardBody) {
+      cardBody.scrollTop = cardBody.scrollHeight;
+    }
+  }
+
+  let chatSocket = null;
+  
+  {% if receiver %}
+  const roomName = '{{ room_name }}';
+  const currentUser = '{{ request.user.username }}';
+  const currentUserId = '{{ request.user.id }}';
+  const currentUserProfilePic = '{{ request.user.profile_pic.url|default:"/static/default_profile.jpg" }}';
+  const receiverUsername = '{{ receiver.username }}';
+
+  // Improved timestamp formatting function
+  function formatTimestamp(timestamp) {
+    try {
+      let date;
+      
+      // Handle different timestamp formats
+      if (typeof timestamp === 'string') {
+        // Try parsing ISO format first
+        if (timestamp.includes('T') || timestamp.includes('Z')) {
+          date = new Date(timestamp);
+        } else {
+          // Try parsing other formats
+          date = new Date(timestamp);
+        }
+      } else if (typeof timestamp === 'number') {
+        // Handle Unix timestamp (seconds or milliseconds)
+        date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        // Fallback to current time
+        date = new Date();
+      }
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid timestamp:', timestamp);
+        return 'Just now';
+      }
+
+      // Format as HH:MM, MMM DD
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[date.getMonth()];
+      const day = date.getDate().toString().padStart(2, '0');
+      
+      return `${hours}:${minutes}, ${month} ${day}`;
+    } catch (error) {
+      console.error('Error formatting timestamp:', error, timestamp);
+      return 'Just now';
+    }
+  }
+
+  function appendMessage(sender, message, isReceived, profilePic, timestamp = null) {
+    if (!chatMessages) return;
+    
+    const cardBody = chatMessages.querySelector('.card-body');
+    if (!cardBody) return;
+
+    // Create unique message ID to prevent duplicates
+    const messageId = `msg-${sender}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Check if this exact message already exists (prevent duplicates)
+    const existingMessages = cardBody.querySelectorAll('.message-item');
+    const messageText = message.trim();
+    const currentTime = new Date().getTime();
+    
+    // Check for duplicate messages within the last 2 seconds
+    for (let existingMsg of existingMessages) {
+      const existingText = existingMsg.querySelector('.message-bubble p')?.textContent?.trim();
+      const existingTimestamp = existingMsg.dataset.timestamp;
+      const existingSender = existingMsg.dataset.sender;
+      
+      if (existingText === messageText && 
+          existingSender === sender && 
+          existingTimestamp && 
+          Math.abs(currentTime - parseInt(existingTimestamp)) < 2000) {
+        console.log('Duplicate message detected, skipping');
+        return;
+      }
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `mb-3 message-item ${!isReceived ? 'text-end' : ''}`;
+    messageDiv.dataset.messageId = messageId;
+    messageDiv.dataset.sender = sender;
+    messageDiv.dataset.timestamp = currentTime.toString();
+
+    // Format timestamp - use current time if none provided
+    const formattedTime = timestamp ? formatTimestamp(timestamp) : formatTimestamp(new Date());
+
+    messageDiv.innerHTML = `
+      <div class="d-flex align-items-start ${!isReceived ? 'justify-content-end' : 'justify-content-start'} mb-1">
+        ${isReceived ? `<img src="${profilePic || '/static/default_profile.jpg'}" class="rounded-circle me-2" width="36" height="36" onerror="this.src='/static/default_profile.jpg'">` : ''}
+        <div class="message-content ${!isReceived ? 'text-end' : 'text-start'}">
+          <div class="message-bubble ${!isReceived ? 'bg-primary text-white' : 'bg-light'} p-2 rounded">
+            <p class="mb-0"></p>
+          </div>
+          <small class="text-muted d-block mt-1">${formattedTime}</small>
+        </div>
+        ${!isReceived ? `<img src="${profilePic || currentUserProfilePic}" class="rounded-circle ms-2" width="36" height="36" onerror="this.src='/static/default_profile.jpg'">` : ''}
+      </div>
+    `;
+
+    // Set text safely to prevent XSS
+    const messageTextEl = messageDiv.querySelector('.message-bubble p');
+    if (messageTextEl) {
+      messageTextEl.textContent = message;
+    }
+
+    cardBody.appendChild(messageDiv);
+    
+    // Scroll to bottom smoothly
+    cardBody.scrollTop = cardBody.scrollHeight;
+    
+    console.log(`Message appended: ${sender} - ${message} - ${formattedTime}`);
+  }
+
+  function updateThreadIndicator(senderId) {
+    const threadLink = document.querySelector(`.list-group-item[data-user-id="${senderId}"]`);
+    if (threadLink && !threadLink.querySelector('.badge.bg-primary')) {
+      const badge = document.createElement('span');
+      badge.className = 'badge bg-primary float-end';
+      badge.textContent = 'New';
+      threadLink.appendChild(badge);
+    }
+  }
+
+  function showConnectionStatus(message, badgeClass) {
+    let statusDiv = document.getElementById('connection-status');
+    if (!statusDiv) {
+      statusDiv = document.createElement('div');
+      statusDiv.id = 'connection-status';
+      statusDiv.style.position = 'fixed';
+      statusDiv.style.top = '90px';
+      statusDiv.style.right = '20px';
+      statusDiv.style.zIndex = '9999';
+      statusDiv.style.maxWidth = '250px';
+      document.body.appendChild(statusDiv);
+    }
+    statusDiv.innerHTML = `<span class="badge ${badgeClass} p-2">${message}</span>`;
+    
+    if (badgeClass === 'bg-success') {
+      setTimeout(() => { 
+        if (statusDiv) statusDiv.innerHTML = ''; 
+      }, 3000);
+    }
+  }
+
+  function connectWebSocket() {
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = protocol + window.location.host + '/ws/chat/' + roomName + '/';
+      console.log('Connecting to WebSocket:', wsUrl);
+      
+      chatSocket = new WebSocket(wsUrl);
+
+      chatSocket.onmessage = function(e) {
+        try {
+          const data = JSON.parse(e.data);
+          console.log('Received WebSocket message:', data);
+          
+          // Only append message if it's from another user (not the sender)
+          // The sender's message was already added when they sent it
+          if (data.sender !== currentUser) {
+            appendMessage(
+              data.sender,
+              data.message,
+              true, // received message
+              data.sender_profile_pic || '/static/default_profile.jpg',
+              data.timestamp || data.created_at || new Date()
+            );
+            
+            updateThreadIndicator(data.sender_id);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      chatSocket.onclose = function(e) {
+        console.log('WebSocket closed unexpectedly:', e.code, e.reason);
+        showConnectionStatus('Connection lost, retrying...', 'bg-warning');
+        
+        // Reconnect after 3 seconds
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      chatSocket.onerror = function(error) {
+        console.error('WebSocket error:', error);
+        showConnectionStatus('Connection error', 'bg-danger');
+      };
+
+      chatSocket.onopen = function() {
+        console.log('WebSocket connected successfully');
+        showConnectionStatus('Connected', 'bg-success');
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error);
+      showConnectionStatus('WebSocket unavailable, using HTTP fallback', 'bg-info');
+    }
+  }
+
+  // Initialize WebSocket connection
+  connectWebSocket();
+
+  // Handle form submission
+  if (messageForm && messageInput && receiverInput) {
+    messageForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      console.log('Sending message:', message);
+
+      // Try WebSocket first
+      if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+        try {
+          const currentTimestamp = new Date().toISOString();
+          const messageData = {
+            message: message,
+            sender: currentUser,
+            sender_id: currentUserId,
+            sender_profile_pic: currentUserProfilePic,
+            receiver: receiverInput.value,
+            timestamp: currentTimestamp
+          };
+          
+          // Add message to UI immediately for sender
+          appendMessage(
+            currentUser,
+            message,
+            false, // not received (sender's message)
+            currentUserProfilePic,
+            currentTimestamp
+          );
+          
+          chatSocket.send(JSON.stringify(messageData));
+          messageInput.value = '';
+          return;
+        } catch (error) {
+          console.error('WebSocket send error:', error);
+          showConnectionStatus('Failed to send via WebSocket, trying HTTP...', 'bg-warning');
+          
+          // Remove the message we just added since WebSocket failed
+          const lastMessage = chatMessages.querySelector('.card-body .message-item:last-child');
+          if (lastMessage && lastMessage.dataset.sender === currentUser) {
+            lastMessage.remove();
+          }
+        }
+      }
+
+      // Fallback to HTTP
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+      if (!csrfToken) {
+        alert('CSRF token not found. Please refresh the page.');
+        return;
+      }
+
+      fetch("{% url 'send_message' %}", {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken.value,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          receiver: receiverInput.value,
+          message: message
+        })
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      }).then(data => {
+        console.log('HTTP response:', data);
+        if (data.status === 'success') {
+          // Add message to UI with proper timestamp
+          appendMessage(
+            currentUser, 
+            data.message || message, // use returned message or original message
+            false, // not received (sender's message)
+            currentUserProfilePic, 
+            data.timestamp || data.created_at || new Date()
+          );
+          messageInput.value = '';
+        } else {
+          alert('Failed to send message: ' + (data.error || 'Unknown error'));
+        }
+      }).catch(error => {
+        console.error('HTTP send error:', error);
+        alert('Failed to send message. Please check your connection and try again.');
+      });
+    });
+
+    // Handle Enter key
+    messageInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        messageForm.dispatchEvent(new Event('submit'));
+      }
+    });
+  }
+
+  // Close WebSocket when leaving page
+  window.addEventListener('beforeunload', function() {
+    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+      chatSocket.close();
+    }
+  });
+
+  {% else %}
+  console.log('No receiver selected, WebSocket not initialized');
+  {% endif %}
+});
+</script>
+
+<!-- Add some custom CSS for better styling -->
+<style>
+.message-bubble {
+  max-width: 70%;
+  word-wrap: break-word;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  position: relative;
+}
+
+.message-bubble.bg-primary {
+  background-color: #0d6efd !important;
+}
+
+.message-bubble.bg-light {
+  background-color: #f8f9fa !important;
+  border: 1px solid #dee2e6;
+}
+
+.message-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+}
+
+.message-content.text-end {
+  align-items: flex-end;
+}
+
+.message-content.text-start {
+  align-items: flex-start;
+}
+
+.message-content small {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+#chat-messages .card-body {
+  padding: 1rem;
+}
+
+.online-status .badge {
+  font-size: 0.75em;
+  padding: 0.25em 0.5em;
+}
+
+#connection-status {
+  transition: opacity 0.3s ease;
+}
+
+.list-group-item {
+  transition: background-color 0.2s ease;
+}
+
+.list-group-item:hover {
+  background-color: #f8f9fa;
+}
+
+.list-group-item.active {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.input-group {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Profile picture styling */
+.rounded-circle {
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Message spacing */
+.message-item {
+  margin-bottom: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .message-bubble {
+    max-width: 85%;
+  }
+  
+  .message-content {
+    max-width: 85%;
+  }
+  
+  .rounded-circle {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+</style>
+
+{% endblock %}
