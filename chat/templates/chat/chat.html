@@ -23,6 +23,17 @@
   .alert {
     display: none !important;
   }
+  /* Message status ticks */
+  .message-status {
+    font-size: 1.1em;
+    vertical-align: middle;
+    margin-left: 4px;
+    color: #a0a0a0;
+    user-select: none;
+  }
+  .message-status.seen {
+    color: #0d6efd; /* WhatsApp blue */
+  }
 </style>
 
 <!-- Override the base.html structure for full-width chat -->
@@ -117,6 +128,15 @@
                       </div>
                       <div class="message-time text-end">
                         <small class="text-muted" style="opacity: 1;">{{ message.created_at|date:"H:i, M d" }}</small>
+                        <span class="message-status {% if message.seen %}seen{% endif %}" data-message-id="{{ message.id }}">
+                          {% if message.seen %}
+                            &#10003;&#10003;
+                          {% elif message.delivered %}
+                            &#10003;&#10003;
+                          {% else %}
+                            &#10003;
+                          {% endif %}
+                        </span>
                       </div>
                     </div>
                     <img src="{{ message.sender.profile_pic.url|default:'/static/default_profile.jpg' }}" 
@@ -536,10 +556,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  function appendMessage(sender, message, isReceived, profilePic, timestamp = null) {
+  // Helper to generate a unique message ID for frontend
+  function generateMessageId(sender, timestamp) {
+    return `msg-${sender}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  function appendMessage(sender, message, isReceived, profilePic, timestamp = null, status = 'sent', msgId = null) {
     if (!messagesContainer) return;
     
-    const messageId = `msg-${sender}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const messageId = msgId || generateMessageId(sender, Date.now());
     const messageText = message.trim();
     const currentTime = new Date().getTime();
     
@@ -585,7 +610,15 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       `;
     } else {
-      // Sent message (right aligned)
+      // Sent message (right aligned) with status ticks
+      let statusHtml = '';
+      if (status === 'seen') {
+        statusHtml = `<span class="message-status seen" data-message-id="${messageId}">&#10003;&#10003;</span>`;
+      } else if (status === 'delivered') {
+        statusHtml = `<span class="message-status" data-message-id="${messageId}">&#10003;&#10003;</span>`;
+      } else {
+        statusHtml = `<span class="message-status" data-message-id="${messageId}">&#10003;</span>`;
+      }
       messageWrapper.innerHTML = `
         <div class="d-flex justify-content-end">
           <div class="message-content-sent">
@@ -594,6 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="message-time text-end">
               <small class="text-muted" style="opacity: 1;">${formattedTime}</small>
+              ${statusHtml}
             </div>
           </div>
           <img src="${profilePic || currentUserProfilePic}" 
@@ -615,7 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log(`Message appended: ${sender} - ${message} - ${formattedTime}`);
   }
 
-  // Initialize existing messages with their timestamps
+  // Initialize existing messages with their timestamps and status
   function initializeExistingMessages() {
     const messageWrappers = document.querySelectorAll('.message-wrapper');
     messageWrappers.forEach(wrapper => {
@@ -663,6 +697,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // --- WhatsApp-like status update handling ---
+  function updateMessageStatus(messageId, status) {
+    const statusEl = document.querySelector(`.message-status[data-message-id="${messageId}"]`);
+    if (statusEl) {
+      if (status === 'delivered') {
+        statusEl.innerHTML = '&#10003;&#10003;';
+        statusEl.classList.remove('seen');
+      } else if (status === 'seen') {
+        statusEl.innerHTML = '&#10003;&#10003;';
+        statusEl.classList.add('seen');
+      }
+    }
+  }
+
   function connectWebSocket() {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -675,6 +723,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
           const data = JSON.parse(e.data);
           console.log('Received WebSocket message:', data);
+
+          // Handle status updates
+          if (data.type === 'status_update' && data.message_id && data.status) {
+            updateMessageStatus(data.message_id, data.status);
+            return;
+          }
           
           if (data.sender !== currentUser) {
             appendMessage(
@@ -686,6 +740,15 @@ document.addEventListener('DOMContentLoaded', function() {
             );
             
             updateThreadIndicator(data.sender_id);
+
+            // Optionally, send seen ack for received message
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN && data.message_id) {
+              chatSocket.send(JSON.stringify({
+                type: 'status_update',
+                message_id: data.message_id,
+                status: 'seen'
+              }));
+            }
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -729,13 +792,15 @@ document.addEventListener('DOMContentLoaded', function() {
       if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
         try {
           const currentTimestamp = new Date().toISOString();
+          const messageId = generateMessageId(currentUser, currentTimestamp);
           const messageData = {
             message: message,
             sender: currentUser,
             sender_id: currentUserId,
             sender_profile_pic: currentUserProfilePic,
             receiver: receiverInput.value,
-            timestamp: currentTimestamp
+            timestamp: currentTimestamp,
+            message_id: messageId
           };
           
           appendMessage(
@@ -743,11 +808,22 @@ document.addEventListener('DOMContentLoaded', function() {
             message,
             false,
             currentUserProfilePic,
-            currentTimestamp
+            currentTimestamp,
+            'sent',
+            messageId
           );
           
           chatSocket.send(JSON.stringify(messageData));
           messageInput.value = '';
+
+          // Simulate delivered and seen for demo (remove in production)
+          setTimeout(() => {
+            updateMessageStatus(messageId, 'delivered');
+            setTimeout(() => {
+              updateMessageStatus(messageId, 'seen');
+            }, 1200);
+          }, 800);
+
           return;
         } catch (error) {
           console.error('WebSocket send error:', error);
@@ -785,12 +861,15 @@ document.addEventListener('DOMContentLoaded', function() {
       }).then(data => {
         console.log('HTTP response:', data);
         if (data.status === 'success') {
+          const messageId = generateMessageId(currentUser, data.timestamp || new Date());
           appendMessage(
             currentUser, 
             data.message || message,
             false,
             currentUserProfilePic, 
-            data.timestamp || data.created_at || new Date()
+            data.timestamp || data.created_at || new Date(),
+            'sent',
+            messageId
           );
           messageInput.value = '';
         } else {

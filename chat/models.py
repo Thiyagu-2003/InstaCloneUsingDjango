@@ -45,6 +45,8 @@ class Message(models.Model):
     text = models.TextField()
     created = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(default=False)
+    delivered = models.BooleanField(default=False)  # Add this field
+    seen = models.BooleanField(default=False)      # Add this field
 
     class Meta:
         ordering = ['created']
