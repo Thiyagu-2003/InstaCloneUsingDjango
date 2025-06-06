@@ -91,7 +91,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         receiver = User.objects.get(username=receiver_username)
         thread, _ = Thread.objects.get_or_create_personal_thread(sender, receiver)
         msg = Message.objects.create(thread=thread, sender=sender, text=message_text)
-        # Optionally, store message_id if you want to match frontend/backend IDs
+        
+        # ✅ Manually update thread.updated_at to reflect latest activity
+        #thread.save(update_fields=['updated_at'])
+
         return msg.id
 
     @database_sync_to_async
