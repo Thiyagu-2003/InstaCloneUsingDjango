@@ -34,6 +34,49 @@
   .message-status.seen {
     color: #0d6efd; /* WhatsApp blue */
   }
+
+  /* Improved Chat List Item Styles */
+  .user-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    transition: background-color 0.2s;
+  }
+
+  /* Unread Badge Styling */
+  .unread-badge {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background-color: #0d6efd;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  /* Message Preview Container */
+  .message-preview-container {
+    flex: 1;
+    margin-right: 25px; /* Make space for badge */
+    overflow: hidden;
+  }
+
+  .message-preview {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85rem;
+  }
 </style>
 
 <!-- Override the base.html structure for full-width chat -->
@@ -76,11 +119,13 @@
                        onerror="this.src='/static/default_profile.jpg'">
                   <div class="flex-grow-1">
                     <div class="fw-medium text-dark">{{ participant.username }}</div>
-                    {% if thread.last_message %}
-                      <small class="text-muted">{{ thread.last_message.text|truncatechars:30 }}</small>
-                    {% endif %}
+                    <div class="message-preview-container">
+                      {% if thread.last_message %}
+                          <small class="text-muted message-preview">{{ thread.last_message.text|truncatechars:30 }}</small>
+                      {% endif %}
+                    </div>
                     {% if thread.unread_count > 0 %}
-                      <span class="badge bg-primary ms-auto">{{ thread.unread_count }}</span>
+                      <span class="unread-badge">{{ thread.unread_count }}</span>
                     {% endif %}
                   </div>
                 </a>
