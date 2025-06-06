@@ -85,6 +85,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         await self.send(text_data=json.dumps(message_data))
 
+        # Send notification to receiver
+        await self.channel_layer.group_send(
+            f"notifications_{receiver_username}",
+            {
+                'type': 'notification_message',
+                'count': await self.get_unread_count(receiver_username)
+            }
+        )
+
     async def status_update(self, event):
         # Forward the status update to WebSocket
         await self.send(text_data=json.dumps({
@@ -123,3 +132,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return True
         except Message.DoesNotExist:
             return False
+
+    @database_sync_to_async
+    def get_unread_count(self, username):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.get(username=username)
+        return Message.objects.filter(receiver=user, is_read=False).count()
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.channel_layer.group_add(
+            f"notifications_{self.scope['user'].username}",
+            self.channel_name
+        )
+        await self.accept()
+        
+        # Send initial unread count
+        count = await self.get_unread_count()
+        await self.send(text_data=json.dumps({
+            'type': 'unread_count',
+            'count': count
+        }))
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            f"notifications_{self.scope['user'].username}",
+            self.channel_name
+        )
+
+    async def notification_message(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    @database_sync_to_async
+    def get_unread_count(self):
+        return Message.objects.filter(
+            receiver=self.scope['user'],
+            is_read=False
+        ).count()

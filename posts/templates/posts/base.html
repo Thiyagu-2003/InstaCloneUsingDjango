@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -29,6 +30,9 @@
             margin-right: 5px;
         }
     </style>
+    {% block extra_head %}
+    <script src="{% static 'js/notifications.js' %}"></script>
+    {% endblock %}
 </head>
 <body>
     <header class="site-header">
@@ -48,6 +52,7 @@
                             <a class="nav-item nav-link" href="{% url 'profile' %}">Profile</a>
                             <a class="nav-item nav-link" href="{% url 'chat_home' %}">
                                 <i class="fas fa-comment-dots chat-icon"></i>Chat
+                                <span id="unread-messages-badge" class="badge bg-danger" style="display: none;">0</span>
                             </a>
                             <form class="form-inline" action="{% url 'logout' %}" method="post">
                                 {% csrf_token %}
