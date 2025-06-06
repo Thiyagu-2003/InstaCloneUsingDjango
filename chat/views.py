@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseNotAllowed
 from django.contrib.auth import get_user_model
 from .models import Thread, Message
+from django.db.models import Count, Q
 
 User = get_user_model()
 
@@ -15,9 +16,19 @@ def user_list(request):
 
 @login_required
 def chat_view(request, username=None):
-    """Main chat view with thread, messages, and WebSocket room setup"""
     all_users = User.objects.exclude(id=request.user.id)
     threads = Thread.objects.filter(users=request.user).order_by('-updated_at')
+
+    # Calculate unread counts for each thread
+    for thread in threads:
+        # Get the other participant in the thread
+        other_user = thread.users.exclude(id=request.user.id).first()
+        thread.last_message = thread.messages.last()
+        # Count unread messages from the other participant
+        thread.unread_count = thread.messages.filter(
+            sender=other_user,
+            read=False
+        ).count() if other_user else 0
 
     receiver = None
     chat_messages = []
@@ -27,9 +38,10 @@ def chat_view(request, username=None):
         receiver = get_object_or_404(User, username=username)
         thread, created = Thread.objects.get_or_create_personal_thread(request.user, receiver)
         chat_messages = thread.messages.all().order_by('created')
+        # Mark messages as read when opening the chat
         thread.messages.filter(sender=receiver, read=False).update(read=True)
 
-        # 🔑 Ensure room name is based on sorted user IDs for WebSocket
+        # Generate room name for WebSocket
         user_ids = sorted([request.user.id, receiver.id])
         room_name = f"{user_ids[0]}_{user_ids[1]}"
 
@@ -38,7 +50,7 @@ def chat_view(request, username=None):
         'threads': threads,
         'receiver': receiver,
         'chat_messages': chat_messages,
-        'room_name': room_name,  # ✅ now available in chat.html
+        'room_name': room_name,
     }
     return render(request, 'chat/chat.html', context)
 

@@ -76,14 +76,12 @@
                        onerror="this.src='/static/default_profile.jpg'">
                   <div class="flex-grow-1">
                     <div class="fw-medium text-dark">{{ participant.username }}</div>
-                    {% with last_message=thread.messages.last %}
-                      {% if last_message %}
-                        <small class="text-muted">{{ last_message.text|truncatechars:30 }}</small>
-                      {% endif %}
-                      {% if last_message and last_message.sender != request.user and not last_message.read %}
-                        <span class="badge bg-primary ms-auto">New</span>
-                      {% endif %}
-                    {% endwith %}
+                    {% if thread.last_message %}
+                      <small class="text-muted">{{ thread.last_message.text|truncatechars:30 }}</small>
+                    {% endif %}
+                    {% if thread.unread_count > 0 %}
+                      <span class="badge bg-primary ms-auto">{{ thread.unread_count }}</span>
+                    {% endif %}
                   </div>
                 </a>
               {% endif %}
