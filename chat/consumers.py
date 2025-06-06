@@ -73,20 +73,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def chat_message(self, event):
-        await self.send(text_data=json.dumps({
-            'message': event['message'],
-            'sender': event['sender'],
-            'sender_profile_pic': event['sender_profile_pic'],
-            'message_id': event['message_id'],
-            'created_at': event.get('timestamp'),  # Use get() to avoid KeyError
-            'type': event.get('type', 'message')
-        }))
+        # Forward the message to WebSocket
+        message_data = {
+            'type': event.get('type', 'message'),
+            'message': event.get('message'),
+            'sender': event.get('sender'),
+            'sender_profile_pic': event.get('sender_profile_pic'),
+            'message_id': event.get('message_id'),
+            'created_at': event.get('timestamp'),
+        }
+        
+        await self.send(text_data=json.dumps(message_data))
 
     async def status_update(self, event):
+        # Forward the status update to WebSocket
         await self.send(text_data=json.dumps({
             'type': 'status_update',
             'message_id': event['message_id'],
             'status': event['status'],
+            'sender': event.get('sender')
         }))
 
     @database_sync_to_async

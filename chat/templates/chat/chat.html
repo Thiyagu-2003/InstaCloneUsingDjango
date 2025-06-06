@@ -750,36 +750,59 @@ document.addEventListener('DOMContentLoaded', function() {
   let seenMessages = new Set();
 
   function updateMessageStatus(messageId, status) {
+    console.log(`Updating message ${messageId} status to ${status}`);
     const statusEl = document.querySelector(`.message-status[data-message-id="${messageId}"]`);
     if (statusEl) {
-      if (status === 'sent') {
-        statusEl.innerHTML = '&#10003;';
-        statusEl.classList.remove('seen');
-      } else if (status === 'delivered') {
-        statusEl.innerHTML = '&#10003;&#10003;';
-        statusEl.classList.remove('seen');
-      } else if (status === 'seen') {
-        statusEl.innerHTML = '&#10003;&#10003;';
-        statusEl.classList.add('seen');
-        seenMessages.add(messageId);
-      }
+        if (status === 'sent') {
+            statusEl.innerHTML = '&#10003;';
+            statusEl.classList.remove('seen');
+        } else if (status === 'delivered') {
+            statusEl.innerHTML = '&#10003;&#10003;';
+            statusEl.classList.remove('seen');
+        } else if (status === 'seen') {
+            statusEl.innerHTML = '&#10003;&#10003;';
+            statusEl.classList.add('seen');
+            
+            // Also update the message wrapper
+            const wrapper = document.querySelector(`.message-wrapper[data-message-id="${messageId}"]`);
+            if (wrapper) {
+                wrapper.classList.add('seen');
+            }
+        }
+        console.log(`Status updated for message ${messageId} to ${status}`);
+    } else {
+        console.warn(`Status element not found for message ${messageId}`);
     }
   }
 
   function markMessagesAsSeen() {
-    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-      const unreadMessages = document.querySelectorAll('.message-wrapper[data-sender]');
-      unreadMessages.forEach(wrapper => {
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+
+    const unreadMessages = document.querySelectorAll('.message-wrapper[data-sender]:not(.seen)');
+    let hasUnreadMessages = false;
+
+    unreadMessages.forEach(wrapper => {
         if (wrapper.dataset.sender !== currentUser) {
-          const messageId = wrapper.dataset.messageId;
-          chatSocket.send(JSON.stringify({
-            type: 'status_update',
-            message_id: messageId,
-            status: 'seen',
-            sender: wrapper.dataset.sender
-          }));
+            hasUnreadMessages = true;
+            const messageId = wrapper.dataset.messageId;
+            chatSocket.send(JSON.stringify({
+                type: 'status_update',
+                message_id: messageId,
+                status: 'seen',
+                sender: wrapper.dataset.sender
+            }));
         }
-      });
+    });
+
+    if (hasUnreadMessages) {
+        // Update the unread badge in chat list if it exists
+        const currentThread = document.querySelector(`.user-item[data-user-id="${receiverInput.value}"]`);
+        if (currentThread) {
+            const unreadBadge = currentThread.querySelector('.unread-badge');
+            if (unreadBadge) {
+                unreadBadge.remove();
+            }
+        }
     }
   }
 
@@ -793,48 +816,47 @@ document.addEventListener('DOMContentLoaded', function() {
 
       chatSocket.onmessage = function(e) {
         try {
-          const data = JSON.parse(e.data);
-          console.log('Received WebSocket message:', data);
+            const data = JSON.parse(e.data);
+            console.log('Received WebSocket message:', data);
 
-          // Handle status updates
-          if (data.type === 'status_update' && data.message_id && data.status) {
-            updateMessageStatus(data.message_id, data.status);
-            return;
-          }
-          
-          if (data.sender !== currentUser) {
-            appendMessage(
-              data.sender,
-              data.message,
-              true,
-              data.sender_profile_pic || '/static/default_profile.jpg',
-              data.timestamp || data.created_at || new Date()
-            );
-            
-            updateThreadIndicator(data.sender_id);
+            if (data.type === 'status_update') {
+                console.log('Status update received:', data);
+                updateMessageStatus(data.message_id, data.status);
+                return;
+            }
 
-            // Send delivered status first
-            if (chatSocket && chatSocket.readyState === WebSocket.OPEN && data.message_id) {
-              chatSocket.send(JSON.stringify({
-                type: 'status_update',
-                message_id: data.message_id,
-                status: 'delivered'
-              }));
+            if (data.sender !== currentUser) {
+                // Show new message
+                appendMessage(
+                    data.sender,
+                    data.message,
+                    true,
+                    data.sender_profile_pic || '/static/default_profile.jpg',
+                    data.created_at || new Date().toISOString(),
+                    'received',
+                    data.message_id
+                );
 
-              // Only send seen if the chat is visible
-              if (document.visibilityState === 'visible') {
-                setTimeout(() => {
-                  chatSocket.send(JSON.stringify({
+                // Send delivered status immediately
+                chatSocket.send(JSON.stringify({
                     type: 'status_update',
                     message_id: data.message_id,
-                    status: 'seen'
-                  }));
-                }, 1000); // Small delay between delivered and seen
-              }
+                    status: 'delivered'
+                }));
+
+                // If chat is visible, mark as seen after a short delay
+                if (document.visibilityState === 'visible') {
+                    setTimeout(() => {
+                        chatSocket.send(JSON.stringify({
+                            type: 'status_update',
+                            message_id: data.message_id,
+                            status: 'seen'
+                        }));
+                    }, 1000);
+                }
             }
-          }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+            console.error('Error handling WebSocket message:', error);
         }
       };
 
@@ -852,9 +874,13 @@ document.addEventListener('DOMContentLoaded', function() {
       chatSocket.onopen = function() {
         console.log('WebSocket connected successfully');
         showConnectionStatus('Connected', 'bg-success');
-        // Mark messages as seen when chat is opened
-        if (document.visibilityState === 'visible') {
-          markMessagesAsSeen();
+        
+        // Check if we're already in a chat and mark messages as seen
+        const shouldMarkSeen = document.visibilityState === 'visible' && 
+                             window.location.pathname.includes('/chat/');
+        
+        if (shouldMarkSeen) {
+            markMessagesAsSeen();
         }
       };
     } catch (error) {
@@ -985,7 +1011,19 @@ document.addEventListener('DOMContentLoaded', function() {
   // After connectWebSocket();
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
-      markMessagesAsSeen();
+      const unreadMessages = document.querySelectorAll('.message-wrapper[data-sender]:not(.seen)');
+      unreadMessages.forEach(wrapper => {
+        if (wrapper.dataset.sender !== currentUser && chatSocket?.readyState === WebSocket.OPEN) {
+          const messageId = wrapper.dataset.messageId;
+          chatSocket.send(JSON.stringify({
+            type: 'status_update',
+            message_id: messageId,
+            status: 'seen',
+            sender: wrapper.dataset.sender
+          }));
+          console.log('Marking message as seen:', messageId);
+        }
+      });
     }
   });
 
