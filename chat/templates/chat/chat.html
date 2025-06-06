@@ -77,6 +77,21 @@
     text-overflow: ellipsis;
     font-size: 0.85rem;
   }
+
+  /* Add emoji reaction styles */
+  .message-reactions {
+    display: flex;
+    gap: 5px;
+    margin-top: 4px;
+  }
+
+  .reaction-button {
+    padding: 2px 5px;
+    border-radius: 12px;
+    background: #f0f2f5;
+    cursor: pointer;
+    font-size: 12px;
+  }
 </style>
 
 <!-- Override the base.html structure for full-width chat -->
@@ -892,6 +907,27 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initialize WebSocket connection
   connectWebSocket();
 
+  // Add typing indicator functionality
+  let typingTimeout;
+  messageInput.addEventListener('input', function() {
+      if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+          chatSocket.send(JSON.stringify({
+              type: 'typing',
+              sender: currentUser,
+              receiver: receiverUsername
+          }));
+          
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => {
+              chatSocket.send(JSON.stringify({
+                  type: 'stop_typing',
+                  sender: currentUser,
+                  receiver: receiverUsername
+              }));
+          }, 2000);
+      }
+  });
+
   // Handle form submission
   if (messageForm && messageInput && receiverInput) {
     messageForm.addEventListener('submit', function(e) {
@@ -1026,6 +1062,35 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   });
+
+  // Add search functionality
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search messages...';
+  searchInput.className = 'form-control mb-3';
+  searchInput.addEventListener('input', function() {
+      const query = this.value.toLowerCase();
+      const messages = document.querySelectorAll('.message-wrapper');
+      messages.forEach(msg => {
+          const text = msg.querySelector('.message-bubble p').textContent.toLowerCase();
+          msg.style.display = text.includes(query) ? 'block' : 'none';
+      });
+  });
+
+  // Prepend search input to the message container
+  const messagesContainerDiv = document.getElementById('messages-scroll');
+  if (messagesContainerDiv) {
+    messagesContainerDiv.parentNode.insertBefore(searchInput, messagesContainerDiv);
+  }
+
+  // Add forwarding functionality
+  function forwardMessage(messageId) {
+    const message = document.querySelector(`[data-message-id="${messageId}"]`);
+    const text = message.querySelector('.message-bubble p').textContent;
+    
+    // Show user selection modal
+    showForwardModal(text);
+}
 
   {% else %}
   console.log('No receiver selected, WebSocket not initialized');
