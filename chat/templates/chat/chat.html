@@ -161,7 +161,10 @@
         <div id="chat-messages" class="flex-grow-1 overflow-hidden">
           <div class="messages-container h-100 overflow-auto p-3" id="messages-scroll">
             {% for message in chat_messages %}
-              <div class="message-wrapper mb-3" data-message-id="{{ message.id }}" data-timestamp="{{ message.created_at|date:'c' }}">
+              <div class="message-wrapper mb-3" 
+                   data-message-id="{{ message.id }}" 
+                   data-timestamp="{{ message.created_at|date:'c' }}"
+                   data-sender="{{ message.sender.username }}">
                 {% if message.sender == request.user %}
                   <!-- Sent message (right aligned) -->
                   <div class="d-flex justify-content-end">
@@ -170,9 +173,12 @@
                         <p class="mb-0">{{ message.text }}</p>
                       </div>
                       <div class="message-time text-end">
-                        <small class="text-muted" style="opacity: 1;">{{ message.created_at|date:"H:i, M d" }}</small>
-                        <span class="message-status {% if message.seen %}seen{% endif %}" data-message-id="{{ message.id }}">
-                          {% if message.seen %}
+                        <small class="text-muted" style="opacity: 1;">
+                          {{ message.created_at|date:"H:i, M d" }}
+                        </small>
+                        <span class="message-status {% if message.read %}seen{% endif %}" 
+                              data-message-id="{{ message.id }}">
+                          {% if message.read %}
                             &#10003;&#10003;
                           {% elif message.delivered %}
                             &#10003;&#10003;
@@ -741,16 +747,39 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // --- WhatsApp-like status update handling ---
+  let seenMessages = new Set();
+
   function updateMessageStatus(messageId, status) {
     const statusEl = document.querySelector(`.message-status[data-message-id="${messageId}"]`);
     if (statusEl) {
-      if (status === 'delivered') {
+      if (status === 'sent') {
+        statusEl.innerHTML = '&#10003;';
+        statusEl.classList.remove('seen');
+      } else if (status === 'delivered') {
         statusEl.innerHTML = '&#10003;&#10003;';
         statusEl.classList.remove('seen');
       } else if (status === 'seen') {
         statusEl.innerHTML = '&#10003;&#10003;';
         statusEl.classList.add('seen');
+        seenMessages.add(messageId);
       }
+    }
+  }
+
+  function markMessagesAsSeen() {
+    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+      const unreadMessages = document.querySelectorAll('.message-wrapper[data-sender]');
+      unreadMessages.forEach(wrapper => {
+        if (wrapper.dataset.sender !== currentUser) {
+          const messageId = wrapper.dataset.messageId;
+          chatSocket.send(JSON.stringify({
+            type: 'status_update',
+            message_id: messageId,
+            status: 'seen',
+            sender: wrapper.dataset.sender
+          }));
+        }
+      });
     }
   }
 
@@ -784,13 +813,24 @@ document.addEventListener('DOMContentLoaded', function() {
             
             updateThreadIndicator(data.sender_id);
 
-            // Optionally, send seen ack for received message
+            // Send delivered status first
             if (chatSocket && chatSocket.readyState === WebSocket.OPEN && data.message_id) {
               chatSocket.send(JSON.stringify({
                 type: 'status_update',
                 message_id: data.message_id,
-                status: 'seen'
+                status: 'delivered'
               }));
+
+              // Only send seen if the chat is visible
+              if (document.visibilityState === 'visible') {
+                setTimeout(() => {
+                  chatSocket.send(JSON.stringify({
+                    type: 'status_update',
+                    message_id: data.message_id,
+                    status: 'seen'
+                  }));
+                }, 1000); // Small delay between delivered and seen
+              }
             }
           }
         } catch (error) {
@@ -812,6 +852,10 @@ document.addEventListener('DOMContentLoaded', function() {
       chatSocket.onopen = function() {
         console.log('WebSocket connected successfully');
         showConnectionStatus('Connected', 'bg-success');
+        // Mark messages as seen when chat is opened
+        if (document.visibilityState === 'visible') {
+          markMessagesAsSeen();
+        }
       };
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
@@ -858,14 +902,6 @@ document.addEventListener('DOMContentLoaded', function() {
           
           chatSocket.send(JSON.stringify(messageData));
           messageInput.value = '';
-
-          // Simulate delivered and seen for demo (remove in production)
-          setTimeout(() => {
-            updateMessageStatus(messageId, 'delivered');
-            setTimeout(() => {
-              updateMessageStatus(messageId, 'seen');
-            }, 1200);
-          }, 800);
 
           return;
         } catch (error) {
@@ -943,6 +979,13 @@ document.addEventListener('DOMContentLoaded', function() {
   window.addEventListener('beforeunload', function() {
     if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
       chatSocket.close();
+    }
+  });
+
+  // After connectWebSocket();
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      markMessagesAsSeen();
     }
   });
 

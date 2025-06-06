@@ -40,16 +40,15 @@ class Thread(models.Model):
         return self.name or f'Thread {self.id}'
 
 class Message(models.Model):
-    thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='messages')
+    thread = models.ForeignKey('Thread', on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField()
-    created = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)  # This ensures timestamp is saved
+    delivered = models.BooleanField(default=False)
     read = models.BooleanField(default=False)
-    delivered = models.BooleanField(default=False)  # Add this field
-    seen = models.BooleanField(default=False)      # Add this field
 
     class Meta:
-        ordering = ['created']
+        ordering = ['created_at']
 
     def __str__(self):
-        return f'From {self.sender} to {self.thread}: {self.text[:20]}...'
+        return f"{self.sender.username}: {self.text[:50]}"

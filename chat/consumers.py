@@ -33,16 +33,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message_id = data.get('message_id')
             status = data.get('status')
             if message_id and status in ['delivered', 'seen']:
-                await self.update_message_status(message_id, status)
-                # Broadcast status update to group
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        'type': 'status_update',
-                        'message_id': message_id,
-                        'status': status,
-                    }
-                )
+                success = await self.update_message_status(message_id, status)
+                if success:
+                    # Broadcast status update using async pattern
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'status_update',
+                            'message_id': message_id,
+                            'status': status,
+                        }
+                    )
             return
 
         # Normal message
@@ -56,7 +57,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return  # Invalid data, silently ignore
 
         # Save the message to DB and get its ID
-        saved_message_id = await self.save_message(sender_username, receiver_username, message, message_id)
+        saved_message_id, created_at = await self.save_message(sender_username, receiver_username, message, message_id)
 
         # Broadcast to group
         await self.channel_layer.group_send(
@@ -67,6 +68,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender': sender_username,
                 'sender_profile_pic': sender_profile_pic,
                 'message_id': saved_message_id,
+                'timestamp': created_at.isoformat(),  # Add the timestamp
             }
         )
 
@@ -74,8 +76,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': event['message'],
             'sender': event['sender'],
-            'sender_profile_pic': event.get('sender_profile_pic', '/static/default_profile.jpg'),
-            'message_id': event.get('message_id'),
+            'sender_profile_pic': event['sender_profile_pic'],
+            'message_id': event['message_id'],
+            'created_at': event.get('timestamp'),  # Use get() to avoid KeyError
+            'type': event.get('type', 'message')
         }))
 
     async def status_update(self, event):
@@ -92,10 +96,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         thread, _ = Thread.objects.get_or_create_personal_thread(sender, receiver)
         msg = Message.objects.create(thread=thread, sender=sender, text=message_text)
         
-        # ✅ Manually update thread.updated_at to reflect latest activity
-        #thread.save(update_fields=['updated_at'])
+        # Update thread's last activity
+        thread.save(update_fields=['updated_at'])
 
-        return msg.id
+        return msg.id, msg.created_at  # Return both ID and timestamp
 
     @database_sync_to_async
     def update_message_status(self, message_id, status):
@@ -103,8 +107,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             msg = Message.objects.get(id=message_id)
             if status == 'delivered':
                 msg.delivered = True
+                msg.save(update_fields=['delivered'])
             elif status == 'seen':
-                msg.seen = True
-            msg.save(update_fields=['delivered', 'seen'])
+                msg.delivered = True
+                msg.read = True
+                msg.save(update_fields=['delivered', 'read'])
+            
+            # Since we're in an async consumer, we should use self.channel_layer directly
+            # Remove async_to_sync as we're already in an async context
+            return True
         except Message.DoesNotExist:
-            pass
+            return False

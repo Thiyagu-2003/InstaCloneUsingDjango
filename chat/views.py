@@ -37,7 +37,7 @@ def chat_view(request, username=None):
     if username:
         receiver = get_object_or_404(User, username=username)
         thread, created = Thread.objects.get_or_create_personal_thread(request.user, receiver)
-        chat_messages = thread.messages.all().order_by('created')
+        chat_messages = thread.messages.all().order_by('created_at')
         # Mark messages as read when opening the chat
         thread.messages.filter(sender=receiver, read=False).update(read=True)
 
@@ -56,45 +56,32 @@ def chat_view(request, username=None):
 
 @login_required
 def send_message(request):
-    """Handle message sending"""
-    if request.method != 'POST':
-        return HttpResponseNotAllowed(['POST'])
-
-    try:
-        data = json.loads(request.body)
-        receiver_username = data.get('receiver')
-        message_text = data.get('message')
-    except Exception:
+    if request.method == 'POST':
         receiver_username = request.POST.get('receiver')
         message_text = request.POST.get('message')
-
-    if not receiver_username or not message_text:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Missing receiver or message'},
-            status=400
-        )
-
-    try:
-        receiver = get_object_or_404(User, username=receiver_username)
-        thread, created = Thread.objects.get_or_create_personal_thread(request.user, receiver)
-
-        message = Message.objects.create(
-            thread=thread,
-            sender=request.user,
-            text=message_text
-        )
-
-        return JsonResponse({
-            'status': 'success',
-            'message': message.text,
-            'sender': request.user.username,
-            'sender_profile_pic': request.user.profile_pic.url if request.user.profile_pic else '/static/default_profile.jpg',
-            'created': message.created.strftime('%Y-%m-%d %H:%M:%S'),
-            'message_id': message.id,
-        })
-
-    except Exception as e:
-        return JsonResponse(
-            {'status': 'error', 'message': str(e)},
-            status=400
-        )
+        
+        try:
+            receiver = User.objects.get(username=receiver_username)
+            # Unpack the tuple returned by get_or_create_personal_thread
+            thread, created = Thread.objects.get_or_create_personal_thread(request.user, receiver)
+            
+            # Create and save the message with timestamp
+            message = Message.objects.create(
+                thread=thread,  # Now using just the thread object
+                sender=request.user,
+                text=message_text
+            )
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': message.text,
+                'message_id': message.id,
+                'created_at': message.created_at.isoformat(),
+                'sender': request.user.username,
+                'sender_profile_pic': request.user.profile_pic.url if request.user.profile_pic else None
+            })
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'error': str(e)})
+    
+    return JsonResponse({'status': 'error', 'error': 'Invalid request method'})
