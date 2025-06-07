@@ -242,6 +242,21 @@
                     <div class="message-content-received">
                       <div class="message-bubble received">
                         <p class="mb-0">{{ message.text }}</p>
+                        {% for attachment in message.attachments.all %}
+                          {% if attachment.file_type|slice:":5" == "image" %}
+                            <div style="margin-top:8px;">
+                              <a href="{{ attachment.file.url }}" target="_blank">
+                                <img src="{{ attachment.file.url }}" alt="Image" style="max-width:120px; max-height:120px; border-radius:6px;">
+                              </a>
+                            </div>
+                          {% else %}
+                            <div style="margin-top:8px;">
+                              <a href="{{ attachment.file.url }}" download>
+                                📎  {{ attachment.file.name|cut:"chat_attachments/" }}
+                              </a>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
                       </div>
                       <div class="message-time">
                         <small class="text-muted" style="opacity: 1;">{{ message.created_at|date:"H:i, M d" }}</small>
