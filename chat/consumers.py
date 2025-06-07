@@ -3,6 +3,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from .models import Thread, Message
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -68,7 +69,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender': sender_username,
                 'sender_profile_pic': sender_profile_pic,
                 'message_id': saved_message_id,
-                'timestamp': created_at.isoformat(),  # Add the timestamp
+                'timestamp': created_at.isoformat(),
+                'receiver': receiver_username,  # <-- Make sure this is included!
             }
         )
 
@@ -85,14 +87,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         await self.send(text_data=json.dumps(message_data))
 
-        # Send notification to receiver
-        await self.channel_layer.group_send(
-            f"notifications_{receiver_username}",
-            {
-                'type': 'notification_message',
-                'count': await self.get_unread_count(receiver_username)
-            }
-        )
+        receiver_username = event.get('receiver')  # Extract receiver from the event
+
+        if receiver_username is not None:
+            await self.channel_layer.group_send(
+                f"notifications_{receiver_username}",
+                {
+                    "type": "new_message_notification",
+                }
+            )
 
     async def status_update(self, event):
         # Forward the status update to WebSocket
@@ -164,9 +167,18 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def notification_message(self, event):
         await self.send(text_data=json.dumps(event))
 
+    async def new_message_notification(self, event):
+        count = await self.get_unread_count()
+        await self.send(text_data=json.dumps({
+            'type': 'unread_count',
+            'count': count,
+        }))
+
     @database_sync_to_async
     def get_unread_count(self):
+        user = self.scope['user']
+        threads = Thread.objects.filter(users=user)  # <-- changed from participants=user
         return Message.objects.filter(
-            receiver=self.scope['user'],
-            is_read=False
-        ).count()
+            thread__in=threads,
+            read=False
+        ).exclude(sender=user).count()
