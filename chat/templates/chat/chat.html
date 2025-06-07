@@ -1,5 +1,6 @@
 {% extends "posts/base.html" %}
 
+
 {% block content %}
 <style>
   /* Custom styles for chat */
@@ -91,6 +92,16 @@
     background: #f0f2f5;
     cursor: pointer;
     font-size: 12px;
+  }
+
+  #attach-btn {
+    padding: 6px 12px;
+    background: #eee;
+    border-radius: 4px;
+    margin-right: 8px;
+  }
+  #attachments-input {
+    display: none;
   }
 </style>
 
@@ -186,6 +197,21 @@
                     <div class="message-content-sent">
                       <div class="message-bubble sent">
                         <p class="mb-0">{{ message.text }}</p>
+                        {% for attachment in message.attachments.all %}
+                          {% if attachment.file_type|slice:":5" == "image" %}
+                            <div style="margin-top:8px;">
+                              <a href="{{ attachment.file.url }}" target="_blank">
+                                <img src="{{ attachment.file.url }}" alt="Image" style="max-width:120px; max-height:120px; border-radius:6px;">
+                              </a>
+                            </div>
+                          {% else %}
+                            <div style="margin-top:8px;">
+                              <a href="{{ attachment.file.url }}" download>
+                                📎  {{ attachment.file.name|cut:"chat_attachments/" }}
+                              </a>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
                       </div>
                       <div class="message-time text-end">
                         <small class="text-muted" style="opacity: 1;">
@@ -238,16 +264,21 @@
 
         <!-- Message input form -->
         <div class="message-input-area p-3 border-top bg-white">
-          <form id="message-form" method="post" action="{% url 'send_message' %}">
+          <form id="chat-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <input type="hidden" name="receiver" id="receiver-input" value="{{ receiver.username }}">
+            <div id="attachment-preview" style="margin-bottom: 10px;"></div>
             <div class="input-group">
+              <!-- Attach button and file input -->
+              <label for="attachments-input" id="attach-btn" class="input-group-text" style="cursor:pointer;">
+                <i class="fas fa-paperclip"></i>
+              </label>
+              <input type="file" name="attachments" id="attachments-input" multiple style="display:none;">
               <input type="text" 
                      id="chat-message-input" 
                      name="message" 
                      class="form-control message-input" 
                      placeholder="Type your message..." 
-                     required 
                      autocomplete="off">
               <button type="submit" 
                       id="chat-message-submit" 
@@ -929,6 +960,38 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Handle form submission
+  document.getElementById('chat-form').onsubmit = function(e) {
+    e.preventDefault();
+    const messageInput = document.getElementById('chat-message-input');
+    const attachmentsInput = document.getElementById('attachments-input');
+    const hasText = messageInput.value.trim().length > 0;
+    const hasFiles = attachmentsInput.files.length > 0;
+
+    if (!hasText && !hasFiles) {
+        // Optionally show a warning to the user
+        alert("Please enter a message or attach a file.");
+        return;
+    }
+
+    var formData = new FormData(this);
+
+    fetch("{% url 'send_message' %}", {
+        method: "POST",
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Optionally, append the new message to the chat
+        // Clear input and preview
+        messageInput.value = '';
+        attachmentsInput.value = '';
+        document.getElementById('attachment-preview').innerHTML = '';
+    });
+};
+
   if (messageForm && messageInput && receiverInput) {
     messageForm.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -1096,6 +1159,50 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('No receiver selected, WebSocket not initialized');
   {% endif %}
 });
+
+document.getElementById('attach-btn').addEventListener('click', function(e) {
+  e.preventDefault();
+  document.getElementById('attachments-input').click();
+});
+
+const attachmentsInput = document.getElementById('attachments-input');
+const previewDiv = document.getElementById('attachment-preview');
+
+attachmentsInput.addEventListener('change', function() {
+    previewDiv.innerHTML = '';
+    Array.from(this.files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            // Show image preview
+            const img = document.createElement('img');
+            img.style.maxWidth = '80px';
+            img.style.maxHeight = '80px';
+            img.style.marginRight = '8px';
+            img.style.borderRadius = '6px';
+            img.src = URL.createObjectURL(file);
+            previewDiv.appendChild(img);
+        } else {
+            // Show file name
+            const fileDiv = document.createElement('div');
+            fileDiv.textContent = '📎 ' + file.name;
+            previewDiv.appendChild(fileDiv);
+        }
+    });
+});
+{% for attachment in message.attachments.all %}
+  {% if attachment.file_type|slice:":5" == "image" %}
+    <div style="margin-top:8px;">
+      <a href="{{ attachment.file.url }}" target="_blank">
+        <img src="{{ attachment.file.url }}" alt="Image" style="max-width:120px; max-height:120px; border-radius:6px;">
+      </a>
+    </div>
+  {% else %}
+    <div style="margin-top:8px;">
+      <a href="{{ attachment.file.url }}" download>
+        📎  {{ attachment.file.name|cut:"chat_attachments/" }}
+      </a>
+    </div>
+  {% endif %}
+{% endfor %}
 </script>
 
 {% endblock %}

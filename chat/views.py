@@ -3,7 +3,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseNotAllowed
 from django.contrib.auth import get_user_model
-from .models import Thread, Message
+from .models import Thread, Message, MessageAttachment
 from django.db.models import Count, Q
 
 User = get_user_model()
@@ -71,6 +71,14 @@ def send_message(request):
                 sender=request.user,
                 text=message_text
             )
+            
+            # Handle file attachments
+            for f in request.FILES.getlist('attachments'):
+                MessageAttachment.objects.create(
+                    message=message,
+                    file=f,
+                    file_type=f.content_type
+                )
             
             return JsonResponse({
                 'status': 'success',
