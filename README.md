@@ -163,37 +163,88 @@ http://127.0.0.1:8000/
 ## 🏗️ Project Structure
 
 ```
-InstaCloneUsingDjango/
-├── accounts/                # User authentication and profile management
-│   ├── models.py           # User profile models
-│   ├── views.py            # Authentication views
-│   ├── forms.py            # User forms
-│   └── urls.py             # Account URLs
-├── posts/                  # Photo posts, likes, and comments
-│   ├── models.py           # Post, Like, Comment models
-│   ├── views.py            # Post-related views
-│   ├── forms.py            # Post creation forms
-│   └── urls.py             # Post URLs
-├── chat/                   # Real-time messaging system
-│   ├── models.py           # Chat models
-│   ├── consumers.py        # WebSocket consumers
-│   ├── routing.py          # WebSocket routing
-│   └── views.py            # Chat views
-├── templates/              # HTML templates
-│   ├── base.html           # Base template
-│   ├── accounts/           # Account templates
-│   ├── posts/              # Post templates
-│   └── chat/               # Chat templates
-├── static/                 # Static assets
-│   ├── css/                # Stylesheets
-│   ├── js/                 # JavaScript files
-│   └── images/             # Static images
-├── media/                  # User uploaded files
-│   ├── profile_pics/       # Profile pictures
-│   └── posts/              # Post images
-├── requirements.txt        # Python dependencies
-├── manage.py              # Django management script
-└── settings.py            # Django settings
+instagram_clone/                      # Root directory of the Django project
+│
+├── chat/                             # Django app for real-time chat functionality
+│   ├── __pycache__/                  # Python cache files (auto-generated)
+│   ├── chat/
+│   │   └── templatetags/             # Custom template filters for chat
+│   │       ├── __init__.py           # Makes this a Python package
+│   │       └── chat_extras.py        # Contains custom template tags
+│   ├── migrations/                   # Database migration files for chat
+│   ├── templates/
+│   │   └── chat/
+│   │       └── chat.html             # HTML template for chat interface
+│   ├── __init__.py                   # Marks chat as a Python module
+│   ├── admin.py                      # Chat model admin configuration
+│   ├── apps.py                       # App configuration
+│   ├── consumers.py                  # WebSocket consumers for real-time chat
+│   ├── models.py                     # Chat-related database models
+│   ├── routing.py                    # WebSocket routing for chat
+│   ├── signals.py                    # Signal handlers (e.g., for notifications)
+│   ├── tests.py                      # Unit tests for chat
+│   ├── urls.py                       # URL routing for chat views
+│   └── views.py                      # Django views for chat
+│
+├── instagram/                        # Django project configuration directory
+│   ├── __pycache__/                  # Python cache files
+│   ├── __init__.py                   # Makes this a Python package
+│   ├── asgi.py                       # ASGI entry point for asynchronous support (e.g., WebSockets)
+│   ├── settings.py                   # Main project settings file
+│   ├── urls.py                       # Root URL configuration
+│   └── wsgi.py                       # WSGI entry point for deployment
+│
+├── media/                            # Uploaded media files
+│   ├── chat_attachments/             # Attachments sent in chat
+│   ├── posts/                        # Media files related to posts
+│   ├── profile_pics/                 # User profile pictures
+│   └── default.jpg                   # Default profile image
+│
+├── posts/                            # Django app for post creation and display
+│   ├── __pycache__/                  # Python cache files
+│   ├── migrations/                   # Database migration files for posts
+│   ├── templates/
+│   │   └── posts/
+│   │       └── user_posts.html       # HTML template for user's posts
+│   ├── __init__.py                   # Makes this a Python module
+│   ├── admin.py                      # Admin interface config for posts
+│   ├── apps.py                       # App configuration
+│   ├── forms.py                      # Django forms for post creation
+│   ├── models.py                     # Database models for posts
+│   ├── tests.py                      # Unit tests for posts
+│   ├── urls.py                       # URL patterns for posts
+│   └── views.py                      # Views for post handling
+│
+├── static/                           # Static files (CSS, JS, etc.)
+│   └── js/
+│       └── notifications.js          # JavaScript for real-time notifications
+│
+├── users/                            # Django app for user management
+│   ├── __pycache__/                  # Python cache files
+│   ├── migrations/                   # Database migration files for users
+│   ├── templates/
+│   │   ├── registration/
+│   │   │   └── login.html            # Login page template
+│   │   └── users/
+│   │       ├── logout.html           # Logout confirmation page
+│   │       ├── profile.html          # Profile management page
+│   │       └── register.html         # User registration page
+│   ├── __init__.py                   # Marks users as a Python package
+│   ├── admin.py                      # Admin interface config for users
+│   ├── apps.py                       # App configuration
+│   ├── forms.py                      # User-related forms
+│   ├── models.py                     # User-related models
+│   ├── tests.py                      # Unit tests for user features
+│   ├── urls.py                       # URL patterns for user views
+│   └── views.py                      # Views for user auth and profiles
+│
+├── venv/                             # Python virtual environment (contains packages/dependencies)
+├── db.sqlite3                        # SQLite database file
+├── LICENSE                           # License file for the project
+├── manage.py                         # Django management script
+├── README.md                         # Project documentation
+└── requirements.txt                  # List of Python dependencies
+
 ```
 
 ## 💡 Real-Time Chat Implementation
