@@ -11,7 +11,7 @@ Welcome to **Instagram Clone Using Django** — a sleek, full-featured social me
 ## 🌟 Demo
 
 > ![Home page]
-> (https://github.com/user-attachments/assets/7798ae67-4a6f-4358-88c4-0bf59acf1fa8)
+(https://github.com/user-attachments/assets/7798ae67-4a6f-4358-88c4-0bf59acf1fa8)
 
 ![profile](https://github.com/user-attachments/assets/5469a379-6a6f-4972-bf8e-583da77f4193)
 
