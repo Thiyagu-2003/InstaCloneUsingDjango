@@ -10,11 +10,7 @@ Welcome to **Instagram Clone Using Django** — a sleek, full-featured social me
 
 ## 🌟 Demo
 
-> ![Home page](image.png)
-![profile](image-1.png)
-![chat room](image-2.png)
-![chat page](image-3.png)
-![login page](image-4.png)
+
 
 ## ✨ Features
 
