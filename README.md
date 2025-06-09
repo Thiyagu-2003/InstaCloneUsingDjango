@@ -10,17 +10,7 @@ Welcome to **Instagram Clone Using Django** — a sleek, full-featured social me
 
 ## 🌟 Demo
 
-> ![Home page]
-(https://github.com/user-attachments/assets/7798ae67-4a6f-4358-88c4-0bf59acf1fa8)
-
-![profile](https://github.com/user-attachments/assets/5469a379-6a6f-4972-bf8e-583da77f4193)
-
-![chat room](https://github.com/user-attachments/assets/a9f3b7d4-c406-4335-b2a5-53dfc2a62402)
-
-![chat page](https://github.com/user-attachments/assets/85c45af8-8eb8-4d5c-9e49-59fcf657eeda)
-
-![login page](https://github.com/user-attachments/assets/29279f0d-d900-4515-9cbe-baf68784bd2b)
-
+<div align="center"> <h4>🏠 Home Page</h4> <img src="https://github.com/user-attachments/assets/7798ae67-4a6f-4358-88c4-0bf59acf1fa8" width="70%" alt="Home page"/> <h4>👤 Profile Page</h4> <img src="https://github.com/user-attachments/assets/5469a379-6a6f-4972-bf8e-583da77f4193" width="70%" alt="Profile page"/> <h4>💬 Chat Room</h4> <img src="https://github.com/user-attachments/assets/a9f3b7d4-c406-4335-b2a5-53dfc2a62402" width="70%" alt="Chat room"/> <h4>📨 Chat Page</h4> <img src="https://github.com/user-attachments/assets/85c45af8-8eb8-4d5c-9e49-59fcf657eeda" width="70%" alt="Chat page"/> <h4>🔐 Login Page</h4> <img src="https://github.com/user-attachments/assets/29279f0d-d900-4515-9cbe-baf68784bd2b" width="70%" alt="Login page"/> </div>
 
 ## ✨ Features
 
