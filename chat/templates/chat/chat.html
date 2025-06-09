@@ -976,36 +976,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Handle form submission
   document.getElementById('chat-form').onsubmit = function(e) {
-    e.preventDefault();
-    const messageInput = document.getElementById('chat-message-input');
-    const attachmentsInput = document.getElementById('attachments-input');
-    const hasText = messageInput.value.trim().length > 0;
-    const hasFiles = attachmentsInput.files.length > 0;
+  e.preventDefault();
 
-    if (!hasText && !hasFiles) {
-        // Optionally show a warning to the user
-        alert("Please enter a message or attach a file.");
-        return;
-    }
+  const message = messageInput.value.trim();
+  const receiver = receiverInput.value;
 
-    var formData = new FormData(this);
+  if (!message) return;
 
+  const currentTimestamp = new Date().toISOString();
+  const messageId = generateMessageId(currentUser, currentTimestamp);
+
+  const messageData = {
+    message: message,
+    sender: currentUser,
+    sender_id: currentUserId,
+    sender_profile_pic: currentUserProfilePic,
+    receiver: receiver,
+    timestamp: currentTimestamp,
+    message_id: messageId
+  };
+
+  appendMessage(
+    currentUser,
+    message,
+    false,
+    currentUserProfilePic,
+    currentTimestamp,
+    'sent',
+    messageId
+  );
+
+  // ✅ Prefer WebSocket
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    chatSocket.send(JSON.stringify(messageData));
+    messageInput.value = '';
+  } else {
+    // 🧯 Fallback to HTTP only if WebSocket fails
     fetch("{% url 'send_message' %}", {
-        method: "POST",
-        body: formData,
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        receiver: receiver,
+        message: message
+      })
     })
     .then(response => response.json())
     .then(data => {
-        // Optionally, append the new message to the chat
-        // Clear input and preview
-        messageInput.value = '';
-        attachmentsInput.value = '';
-        document.getElementById('attachment-preview').innerHTML = '';
-    });
+      console.log('Fallback HTTP response:', data);
+    })
+    .catch(err => console.error('HTTP send error:', err));
+  }
 };
+
 
   if (messageForm && messageInput && receiverInput) {
     messageForm.addEventListener('submit', function(e) {
