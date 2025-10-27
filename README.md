@@ -378,9 +378,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 Got questions or want to collaborate? Feel free to reach out!
 
 - **GitHub**: [@Thiyagu-2003](https://github.com/Thiyagu-2003)
-- **Email**: sthiyagu675@example.com
-- **LinkedIn**: [Your LinkedIn Profile](https://linkedin.com/in/your-profile)
-- **Portfolio**: [Your Portfolio Website](https://your-portfolio.com)
+- **Email**: sthiyagu466@gmail.com
+- **LinkedIn**: [Your LinkedIn Profile](https://www.linkedin.com/in/thiyagu-s-ai/)
 
 ## 🙏 Acknowledgments
 
